@@ -61,34 +61,39 @@ Para manejar las conexiones de múltiples clientes simultáneamente, el servidor
 
 
 ## Diagrama Entidad-Relación
-┌─────────────────────────┐
-│        users            │
-├─────────────────────────┤
-│ id (PK)                 │
-│ username (UNIQUE)       │
-│ password_hash           │
-│ created_at              │
-└──────────┬──────────────┘
-           │
-           │ 1:N
-           │
-     ┌─────┴─────────────────────┐
-     │                           │
-     │                           │
-┌────▼───────────────┐      ┌────▼────────────────┐
-│      matches       │      │       stats         │
-├────────────────────┤      ├─────────────────────┤
-│ id (PK)            │      │ user_id (PK, FK)    │
-│ player1_id (FK)    │      │ total_matches       │
-│ player2_id (FK)    │      │ wins                │
-│ winner_id (FK)     │      │ losses              │
-│ played_at          │      │ draws               │
-│ duration_seconds   │      │ win_rate            │
-└────────────────────┘      │ current_streak      │
-                            │ best_streak         │
-                            │ ranking_points      │
-                            │ updated_at          │
-                            └─────────────────────┘
+
+```
+                         +---------------------------+
+                         |         users             |
+                         +---------------------------+
+                         | - id (PK)                 |
+                         | - username (UNIQUE)       |
+                         | - password_hash           |
+                         | - created_at              |
+                         +-------------+-------------+
+                                       |
+                                       | 1:N
+                                       |
+            +--------------------------+---------------------------+
+            |                                                      |
+            v                                                      v
++-----------------------+                                +------------------------+
+|      matches          |                                |        stats           |
+|   (como player1)      |                                |                        |
++-----------------------+                                +------------------------+
+| - id (PK)             |                                | - user_id (PK, FK)     |
+| - player1_id (FK)     |                                | - total_matches        |
+| - player2_id (FK)     |                                | - wins                 |
+| - winner_id (FK)      |                                | - losses               |
+| - played_at           |                                | - draws                |
+| - duration_seconds    |                                | - win_rate             |
++-----------------------+                                | - current_streak       |
+                                                         | - best_streak          |
+                                                         | - ranking_points       |
+                                                         | - updated_at           |
+                                                         +------------------------+
+```
+
 ## Nodos Principales
 
 1. **Cliente (CLI)**:
