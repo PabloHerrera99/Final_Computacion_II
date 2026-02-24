@@ -113,4 +113,4 @@ Separar la lógica del juego del procesamiento de datos permite que ambos trabaj
 3. **¿Por qué SQLite?** 
 Base de datos ligera, sin necesidad de servidor adicional, suficiente para el alcance del proyecto.
 
-(Creo que podria usarce una base de datos no relacional pero para facilitar el desarrollo decici usar una base de datos que me resulte mas comoda al desarrollar)
+(Creo que podria usarse una base de datos no relacional pero para facilitar el desarrollo decidí usar una base de datos que me resulte mas comoda al desarrollar)
