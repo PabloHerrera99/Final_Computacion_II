@@ -110,7 +110,7 @@ Al ser un sistema simple en donde la comunicacion se realiza con comandos simple
 
 Separar la lógica del juego del procesamiento de datos permite que ambos trabajen en paralelo sin bloquearse mutuamente.
 
-4. **¿Por qué SQLite?** 
+3. **¿Por qué SQLite?** 
 Base de datos ligera, sin necesidad de servidor adicional, suficiente para el alcance del proyecto.
 
 (Creo que podria usarce una base de datos no relacional pero para facilitar el desarrollo decici usar una base de datos que me resulte mas comoda al desarrollar)
