@@ -49,7 +49,7 @@ El ranking se actualiza automáticamente después de cada partida finalizada y p
 - **Paralelismo:** El servidor está dividido en dos procesos: uno encargado de manejar la lógica del juego y las conexiones, y otro encargado de gestionar las consultas a la base de datos, estadísticas y la API.
 - **IPC (Inter-Process Communication):** Los dos procesos se comunican a través de `pipes` para intercambiar información de manera eficiente.
 - **Comunicación Asíncrona:** El servidor y los clientes se comunican utilizando sockets TCP de manera no bloqueante mediante asyncio.
-- **Flask y API REST:** Se utiliza Flask como microframework para la gestión de la API REST que maneja usuarios, partidas y estadísticas.
+- **Flask y API REST:** Se utiliza Flask para la gestión de la API REST que maneja usuarios, partidas y estadísticas.
 - **Parseo de Argumentos:** El cliente utiliza `argparse` para procesar argumentos de línea de comandos.
 - **Persistencia de Datos:** Base de datos SQLite para almacenar usuarios, partidas, estadísticas y ranking.
 - **Manejo de Estado del Juego:** El servidor mantiene el estado de múltiples partidas simultáneas y envía actualizaciones a los clientes correspondientes.
@@ -64,10 +64,10 @@ El ranking se actualiza automáticamente después de cada partida finalizada y p
 |                |         |        Proceso 1                           Proceso 2              |
 |  +----------+  |   TCP   |   +------------------------+   Pipe   +-------------------------+ |
 |  | Jugador  |  +-------->|   | Lógica de Juego        +--------->| Consultas a API         | |
-|  | argparse |  |         |   | Gestión de Clientes    |<---------+ Procesamiento de Stats | |
+|  | argparse |  |         |   | Gestión de Clientes    |<---------+ Procesamiento de Stats  | |
 |  +----------+  |         |   | AsyncIO (Sockets)      |   Pipe   +------------+------------+ |
 |                |         |   +------------------------+                       |              |
-+----------------+         +---------------------------------------------------|--------------|
++----------------+         +----------------------------------------------------|--------------|
                                                                                 |
                                                                                 | HTTP
                                                                                 v
@@ -187,4 +187,3 @@ El ranking se actualiza automáticamente después de cada partida finalizada y p
 
 4. **¿Por qué SQLite?** Base de datos ligera, sin necesidad de servidor adicional, suficiente para el alcance del proyecto. Fácilmente migrable a PostgreSQL si se requiere escalabilidad.
 
-5. **¿Por qué sistema de ranking?** Añade valor al proyecto demostrando procesamiento de datos agregados y cálculos estadísticos, además de motivar a los usuarios a seguir jugando.
