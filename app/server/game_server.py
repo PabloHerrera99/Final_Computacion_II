@@ -122,7 +122,7 @@ async def start_game(p1, p2, pipe):
             
             # CHECK: Ganador o empate
             winner = board.check_winner()
-            is_draw = board.is_full() and winner is None
+            is_draw = board.is_board_full()
             board_state = board.get_board_state()
 
             # Fin de partida
