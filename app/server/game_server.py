@@ -58,123 +58,93 @@ async def start_game(p1, p2, pipe):
             'opponent': players[1 - i].username
         })
 
-    read_tasks = [asyncio.create_task(p.reader.read(1024)) for p in players]
-    try:
-        while True:
-            done, _ = await asyncio.wait(read_tasks, return_when=asyncio.FIRST_COMPLETED)
+    while True:
+        active  = players[current]
+        waiting = players[1 - current]
 
-            task = next(iter(done))
-            idx = read_tasks.index(task)
+        try:
+            data = await active.reader.readline()
+        except Exception:
+            data = None
+
+        if not data:
+            log.info(f"{active.username} se desconectó durante la partida")
             try:
-                data = task.result()
-            except Exception:
-                data = await task
-
-            read_tasks[idx] = asyncio.create_task(players[idx].reader.readline())
-
-            # CHECK: Si el jugador se desconectó, terminar la partida y declarar ganador al otro
-            if not data:
-                log.info(f"Jugador {players[idx].username} se desconecto durante la partida.")
-                winner = players[1 - idx]
-                try:
-                    await send_msg(winner.writer, GAME_OVER, {
-                        'winner': winner.username,
-                        'reason': 'opponent_disconnected'
-                    })
-                except Exception:
-                    pass
-                await pipe_request(pipe, {
-                    'action': 'save_match',
-                    'player1_id': p1.user_id,
-                    'player2_id': p2.user_id,
-                    'winner_id': winner.user_id,
-                    'duration_seconds': int(time.time() - start_time)
+                await send_msg(waiting.writer, GAME_OVER, {
+                    'result': 'win',
+                    'reason': f'{active.username} se desconectó'
                 })
-                return
-            
-            # CHECK: Si NO es el turno del jugador activo, RECHAZAR
-            if idx != current:
-                try:
-                    await send_msg(players[idx].writer, ERROR, {'message': 'No es tu turno'})
-                except Exception:
-                    pass
-                continue
-            
-            # CHECK: Validacion del movimiento
-            try:
-                msg_type, payload = decode_message(data)
             except Exception:
-                await send_msg(players[idx].writer, ERROR, {'message': 'Mensaje inválido'})
-                continue
+                pass
+            await pipe_request(pipe, {
+                'action': 'save_match',
+                'player1_id': p1.user_id,
+                'player2_id': p2.user_id,
+                'winner_id': waiting.user_id,
+                'duration_seconds': int(time.time() - start_time)
+            })
+            break
 
-            if msg_type != MOVE:
-                await send_msg(players[idx].writer, ERROR, {'message': 'Se esperaba un movimiento'})
-                continue 
+        try:
+            msg_type, payload = decode_message(data)
+        except Exception:
+            await send_msg(active.writer, ERROR, {'message': 'Mensaje inválido'})
+            continue
 
-            col = payload.get('column')
-            if not isinstance(col, int):
-                await send_msg(players[idx].writer, ERROR, {'message': 'Columna inválida'})
-                continue
-            success, _ = board.drop_piece(col, current + 1)
-            if not success:
-                await send_msg(players[idx].writer, ERROR, {'message': 'Columna llena o inválida'})
-                continue
-            
-            # CHECK: Ganador o empate
-            winner = board.check_winner()
-            is_draw = board.is_board_full()
-            board_state = board.get_board_state()
+        if msg_type != MOVE:
+            await send_msg(active.writer, ERROR, {'message': 'Se esperaba un movimiento'})
+            continue
 
-            # Fin de partida
-            if winner or is_draw:
-                winner_id = None
-                if winner:
-                
-                    winner_p = players[current]
-                    loser_p = players[1 - current]
-                    winner_id = winner_p.user_id
-                    await send_msg(winner_p.writer, GAME_OVER, {'result': 'win', 'board': board_state})
-                    await send_msg(loser_p.writer, GAME_OVER, {'result': 'lose', 'board': board_state})
-                    log.info(f"Partida finalizada: {winner_p.username} ganó a {loser_p.username}")
-                else:
-                    for p in players:
-                        await send_msg(p.writer, GAME_OVER, {'result': 'draw', 'board': board_state})
-                    log.info(f"Partida finalizada: Empate entre {p1.username} y {p2.username}")
-                
-                await pipe_request(pipe, {
-                    'action': 'save_match',
-                    'player1_id': p1.user_id,
-                    'player2_id': p2.user_id,
-                    'winner_id': winner_id,
-                    'duration_seconds': int(time.time() - start_time)
-                })
-                return
-            
-            # Cambio de turno
-            current = 1 - current
-            
-            if read_tasks[current].done():
-                try:
-                    read_tasks[current].result()
-                    log.info(f"Descarte de mensaje obsoletos de {players[current].username}")
-                except Exception:
-                    pass
-                read_tasks[current] = asyncio.create_task(players[current].reader.readline())
-            
-            for i, p in enumerate(players):
-                await send_msg(p.writer, BOARD_UPDATE, {
-                    'board': board_state,
-                    'your_turn': i == current,
-                    'player_num': i + 1
-                    })
-    finally:
-        for t in read_tasks:
-            if not t.done():
-                t.cancel()
-        p1.game_done.set()
-        p2.game_done.set()
+        col = payload.get('column')
+        if not isinstance(col, int):
+            await send_msg(active.writer, ERROR, {'message': 'Columna inválida'})
+            continue
 
+        success, _ = board.drop_piece(col, current + 1)
+        if not success:
+            await send_msg(active.writer, ERROR, {'message': 'Columna inválida o llena'})
+            continue
 
+        winner_num = board.check_winner()
+        is_draw    = board.is_board_full()
+        board_state = board.get_board_state()
+
+        if winner_num or is_draw:
+            winner_id = None
+            if winner_num:
+                winner_p = players[current]
+                loser_p  = players[1 - current]
+                winner_id = winner_p.user_id
+                await send_msg(winner_p.writer, GAME_OVER, {'result': 'win',  'board': board_state})
+                await send_msg(loser_p.writer,  GAME_OVER, {'result': 'loss', 'board': board_state})
+                log.info(f"Ganador: {winner_p.username}")
+            else:
+                for p in players:
+                    await send_msg(p.writer, GAME_OVER, {'result': 'draw', 'board': board_state})
+                log.info("Empate")
+
+            await pipe_request(pipe, {
+                'action': 'save_match',
+                'player1_id': p1.user_id,
+                'player2_id': p2.user_id,
+                'winner_id': winner_id,
+                'duration_seconds': int(time.time() - start_time)
+            })
+            break
+
+        # Cambiar turno y notificar a ambos
+        current = 1 - current
+        for i, p in enumerate(players):
+            await send_msg(p.writer, BOARD_UPDATE, {
+                'board': board_state,
+                'your_turn': i == current,
+                'player_num': i + 1
+            })
+
+    # Señalar a handle_client que la partida terminó
+    p1.game_done.set()
+    p2.game_done.set()
+    
 async def handle_client(reader, writer, pipe):
     addr = writer.get_extra_info('peername')
     log.info(f"Nueva conexión: {addr}")
