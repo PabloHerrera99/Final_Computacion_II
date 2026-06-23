@@ -27,7 +27,10 @@ class Player:
         self.writer = writer
         self.username = username
         self.user_id = user_id
+        self.alive = True
+        self.matched = asyncio.Event()
         self.game_done = asyncio.Event()
+        self.ready_for_game = asyncio.Event()
         
 async def send_msg(writer, msg_type, payload=None):
     writer.write(encode_message(msg_type, payload or {}))
@@ -193,8 +196,32 @@ async def handle_client(reader, writer, pipe):
             player = Player(reader, writer, username, user_id)
             await send_msg(writer, WAITING, {'message': 'Esperando oponente...'})
             await waiting_queue.put(player)
-            await player.game_done.wait()   # se bloquea aquí hasta que termine la partida
 
+            # empareja el matchmaker o el cliente se desconecta
+            disconnect_task = asyncio.create_task(reader.readline())
+            match_task = asyncio.create_task(player.matched.wait())
+            done, _ = await asyncio.wait(
+                [disconnect_task, match_task],
+                return_when=asyncio.FIRST_COMPLETED
+            )
+
+            if match_task in done:
+                # Cancelar la lectura para liberar el reader.
+                disconnect_task.cancel()
+                try:
+                    await disconnect_task
+                except (asyncio.CancelledError, Exception):
+                    pass
+                player.ready_for_game.set()       # avisar al matchmaker
+                await player.game_done.wait()     # esperar fin de partida
+            else:
+                # Desconexión antes del emparejamiento
+                match_task.cancel()
+                player.alive = False
+                player.ready_for_game.set()       # liberar al matchmaker si está esperando
+                log.info(f"{username} se desconectó de la cola")
+                
+     
         elif msg_type == HISTORY_REQUEST:
             resp = await pipe_request(pipe, {
                 'action': 'history',
@@ -220,12 +247,37 @@ async def handle_client(reader, writer, pipe):
             pass
         log.info(f"Conexión cerrada: {addr}")
 
-
+async def get_waiting_players():
+    while True:
+        p = await waiting_queue.get()
+        if p.alive:
+            return p
+        log.info(f"{p.username} estaba desconectado, buscando otro jugador...")
+        p.game_done.set()  # liberar al matchmaker si estaba esperando
+        
 async def matchmaker(pipe):
     log.info("Matchmaker activo")
     while True:
-        p1 = await waiting_queue.get()
-        p2 = await waiting_queue.get()
+        p1 = await get_waiting_players()
+        p2 = await get_waiting_players()
+        
+        p1.matched.set()
+        p2.matched.set()
+        
+        await p1.ready_for_game.wait()
+        await p2.ready_for_game.wait()
+        
+        if not p1.alive or not p2.alive:
+            log.info("Un jugador se desconectó antes de iniciar la partida, buscando reemplazo...")
+            for p in [p1, p2]:
+                if p.alive:
+                    p.matched.clear()
+                    p.ready_for_game.clear()
+                    await waiting_queue.put(p)
+                else:
+                    p.game_done.set()  # liberar al matchmaker si estaba esperando
+            continue
+        
         log.info(f"Partida: {p1.username} vs {p2.username}")
         asyncio.create_task(start_game(p1, p2, pipe))
 
