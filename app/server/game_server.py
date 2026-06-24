@@ -4,6 +4,8 @@ import time
 import sys
 import os
 
+TURN_TIMEOUT = 120  # segundos
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 from app.common.protocol import (
@@ -66,7 +68,32 @@ async def start_game(p1, p2, pipe):
         waiting = players[1 - current]
 
         try:
-            data = await active.reader.readline()
+            data = await asyncio.wait_for(active.reader.readline(), timeout=TURN_TIMEOUT)
+        except asyncio.TimeoutError:
+            log.info(f"{active.username} se desconectó por timeout")
+            try:
+                await send_msg(active.writer, GAME_OVER, {
+                    'result': 'loss',
+                    'reason': f'Se te desconectó por timeout {TURN_TIMEOUT}s'
+                })
+            except Exception:
+                pass
+            try:
+                await send_msg (waiting.writer, GAME_OVER, {
+                    'result': 'win',
+                    'reason': f'{active.username} se desconectó por timeout {TURN_TIMEOUT}s'
+                })
+            except Exception:
+                pass
+            await pipe_request(pipe, {
+                'action': 'save_match',
+                'player1_id': p1.user_id,
+                'player2_id': p2.user_id,
+                'winner_id': waiting.user_id,
+                'duration_seconds': int(time.time() - start_time)
+            })
+            break
+       
         except Exception:
             data = None
 
