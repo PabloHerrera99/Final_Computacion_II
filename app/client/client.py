@@ -2,6 +2,7 @@ import sys
 import os
 import socket
 import argparse
+import select
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
@@ -23,6 +24,12 @@ def recv_msg(sock_file):
     if not line:
         raise ConnectionError("Servidor desconectado")
     return decode_message(line)
+
+
+# Descarta input acumulado en stdin mientras se esperaba turno."""
+def drain_stdin():
+    while select.select([sys.stdin], [], [], 0)[0]:
+        sys.stdin.readline()
 
 
 def render_board(board_state, player_num):
@@ -73,6 +80,7 @@ def play_game(sock, sock_file):
             print(render_board(board, player_num))
 
             if your_turn:
+                drain_stdin()
                 print("  *** Tu turno ***")
                 send_msg(sock, MOVE, {'column': ask_column()})
             else:
@@ -81,6 +89,7 @@ def play_game(sock, sock_file):
         elif msg_type == ERROR:
             print(f"  [!] {payload.get('message')}")
             if your_turn:
+                drain_stdin()
                 send_msg(sock, MOVE, {'column': ask_column()})
 
         elif msg_type == GAME_OVER:

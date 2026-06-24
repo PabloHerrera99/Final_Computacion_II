@@ -147,7 +147,8 @@ async def start_game(p1, p2, pipe):
     # Señalar a handle_client que la partida terminó
     p1.game_done.set()
     p2.game_done.set()
-    
+
+
 async def handle_client(reader, writer, pipe):
     addr = writer.get_extra_info('peername')
     log.info(f"Nueva conexión: {addr}")
