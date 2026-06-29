@@ -26,7 +26,7 @@ def recv_msg(sock_file):
     return decode_message(line)
 
 
-# Descarta input acumulado en stdin mientras se esperaba turno."""
+# Descarta input acumulado en stdin mientras se esperaba turno.
 def drain_stdin():
     while select.select([sys.stdin], [], [], 0)[0]:
         sys.stdin.readline()

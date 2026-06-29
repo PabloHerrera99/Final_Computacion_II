@@ -54,6 +54,39 @@ El ranking se actualiza automáticamente después de cada partida finalizada y p
 - **Persistencia de Datos:** Base de datos SQLite para almacenar usuarios, partidas, estadísticas y ranking.
 - **Manejo de Estado del Juego:** El servidor mantiene el estado de múltiples partidas simultáneas y envía actualizaciones a los clientes correspondientes.
 
+## Diagrama Entidad-Relación
+
+```
+                         +---------------------------+
+                         |         users             |
+                         +---------------------------+
+                         | - id (PK)                 |
+                         | - username (UNIQUE)       |
+                         | - password_hash           |
+                         | - created_at              |
+                         +-------------+-------------+
+                                       |
+                                       | 1:N
+                                       |
+            +--------------------------+---------------------------+
+            |                                                      |
+            v                                                      v
++-----------------------+                                +------------------------+
+|      matches          |                                |        stats           |
+|   (como player1)      |                                |                        |
++-----------------------+                                +------------------------+
+| - id (PK)             |                                | - user_id (PK, FK)     |
+| - player1_id (FK)     |                                | - total_matches        |
+| - player2_id (FK)     |                                | - wins                 |
+| - winner_id (FK)      |                                | - losses               |
+| - played_at           |                                | - draws                |
+| - duration_seconds    |                                | - win_rate             |
++-----------------------+                                | - current_streak       |
+                                                         | - best_streak          |
+                                                         | - ranking_points       |
+                                                         | - updated_at           |
+                                                         +------------------------+
+```
 
 # Gráfico de la Arquitectura
 
@@ -179,11 +212,16 @@ El ranking se actualiza automáticamente después de cada partida finalizada y p
 
 ## Justificaciones Técnicas
 
-1. **¿Por qué AsyncIO?** Permite manejar muchas conexiones de clientes simultáneamente sin crear un proceso o thread por cada uno, optimizando recursos.
+1. **¿Por qué AsyncIO?** 
 
-2. **¿Por qué Multiprocessing + Pipes?** Separar la lógica del juego del procesamiento de datos permite que ambos trabajen en paralelo sin bloquearse mutuamente. Los pipes proveen un mecanismo de IPC eficiente y simple.
+Al ser un sistema simple en donde la comunicacion se realiza con comandos simples me parecio mejor usar AsynIO permite manejar muchas conexiones de clientes simultáneamente sin crear un proceso o thread por cada uno, optimizando recursos.
 
-3. **¿Por qué API REST separada?** Desacopla la lógica de negocio de la persistencia de datos, facilitando futuras extensiones (ej: interfaz web, app móvil).
+2. **¿Por qué Multiprocessing + Pipes?** 
 
-4. **¿Por qué SQLite?** Base de datos ligera, sin necesidad de servidor adicional, suficiente para el alcance del proyecto. Fácilmente migrable a PostgreSQL si se requiere escalabilidad.
+Separar la lógica del juego del procesamiento de datos permite que ambos trabajen en paralelo sin bloquearse mutuamente.
+
+3. **¿Por qué SQLite?** 
+Base de datos ligera, sin necesidad de servidor adicional, suficiente para el alcance del proyecto.
+
+(Creo que podria usarse una base de datos no relacional pero para facilitar el desarrollo decidí usar una base de datos que me resulte mas comoda al desarrollar)
 
